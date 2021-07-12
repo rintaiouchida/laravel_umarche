@@ -1,0 +1,87 @@
+version: "3.8"
+volumes:
+  rdb-store:
+networks:
+  backend:
+    name: jnote-backend
+    driver: bridge
+services:
+  app:
+    container_name: jnote-app
+    image: jnote-app
+    build:
+      context: ./.docker/app
+    volumes:
+      - .:/work/backend
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=rdb
+      - DB_PORT=3306
+      - DB_DATABASE=${DOCKER_DB_DATABASE:-laravel_local}
+      - DB_USERNAME=${DOCKER_DB_USER:-phper}
+      - DB_PASSWORD=${DOCKER_DB_PASSWORD:-secret}
+      - TEST_DB_HOST=test_db
+      - TEST_DB_PORT=3306
+    networks:
+      - backend
+    expose:
+      - "9000"
+
+  web:
+    container_name: jnote-web
+    image: jnote-web
+    build:
+      context: ./.docker/web
+    ports:
+      - ${DOCKER_WEB_PORT:-80}:80
+    volumes:
+      - .:/work/backend
+    networks:
+      - backend
+
+  rdb:
+    container_name: jnote-rdb
+    image: jnote-rdb
+    build:
+      context: ./.docker/rdb
+    volumes:
+      - rdb-store:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${DOCKER_DB_DATABASE:-laravel_local}
+      - MYSQL_USER=${DOCKER_DB_USER:-phper}
+      - MYSQL_PASSWORD=${DOCKER_DB_PASSWORD:-secret}
+      - MYSQL_ROOT_PASSWORD=${DOCKER_DB_PASSWORD:-secret}
+    networks:
+      - backend
+    ports:
+      - ${DOCKER_RDB_PORT:-3306}:3306
+
+  test-rdb:
+    container_name: jnote-test-rdb
+    build:
+      context: ./.docker/rdb
+    ports:
+      - ${DOCKER_TEST_RDB_PORT:-13306}:3306
+    environment:
+      - MYSQL_DATABASE=${DOCKER_DB_DATABASE:-laravel_local}
+      - MYSQL_USER=${DOCKER_DB_USER:-phper}
+      - MYSQL_PASSWORD=${DOCKER_DB_PASSWORD:-secret}
+      - MYSQL_ROOT_PASSWORD=${DOCKER_DB_PASSWORD:-secret}
+
+  kvs:
+    container_name: jnote-kvs
+    image: jnote-kvs
+    build:
+      context: ./.docker/kvs
+    networks:
+      - backend
+    ports:
+      - ${DOCKER_KVS_PORT:-6379}:6379
+
+  mail:
+    container_name: jnote-mail
+    image: mailhog/mailhog
+    networks:
+      - backend
+    ports:
+      - 8025:8025
